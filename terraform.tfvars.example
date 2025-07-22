@@ -1,0 +1,30 @@
+project_id_hub = "prj-hub-local-dns"
+project_id_prd = "prj-prd-local-dns"
+project_id_dev = "prj-dev-local-dns"
+vpc_name_hub   = "vpc-hub"
+vpc_name_prd   = "vpc-prd"
+vpc_name_dev   = "vpc-dev"
+
+subnet_hub = {
+  subnet_name           = "vpcs-hub-us-central1-a"
+  subnet_ip             = "10.0.0.0/24"
+  subnet_region         = "us-central1"
+  subnet_private_access = "true"
+  description           = "Subnet for vpc-hub"
+}
+
+subnet_prd = {
+  subnet_name           = "vpcs-prd-us-central1-a"
+  subnet_ip             = "10.10.0.0/24"
+  subnet_region         = "us-central1"
+  subnet_private_access = "true"
+  description           = "Subnet for vpc-prd"
+}
+
+subnet_dev = {
+  subnet_name           = "vpcs-dev-us-central1-a"
+  subnet_ip             = "10.20.0.0/24"
+  subnet_region         = "us-central1"
+  subnet_private_access = "true"
+  description           = "Subnet for vpc-dev"
+}
