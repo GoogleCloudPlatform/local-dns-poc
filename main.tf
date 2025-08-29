@@ -80,10 +80,10 @@ locals {
 }
 
 module "vpcs" {
-  source       = "terraform-google-modules/network/google"
-  version      = "11.1.1"
-  for_each     = local.network_configs
-  depends_on   = [google_project_service.apis] # Ensure APIs are enabled first
+  source     = "terraform-google-modules/network/google"
+  version    = "11.1.1"
+  for_each   = local.network_configs
+  depends_on = [google_project_service.apis] # Ensure APIs are enabled first
 
   project_id   = each.value.project_id
   network_name = each.value.network_name
@@ -284,7 +284,7 @@ resource "google_compute_instance" "hub_dns_server_vms" {
     enable_secure_boot = true
   }
   metadata_startup_script = "#!/bin/bash\n echo 'Hub ${each.key} DNS VM created!'"
-//  tags                    = ["dns-server", "hub-vm"]
+  //  tags                    = ["dns-server", "hub-vm"]
 }
 /*
 resource "google_compute_instance" "spoke_prd_vms" {
@@ -336,7 +336,7 @@ resource "google_compute_instance" "spoke_prd_cli_vms" {
   }
 
   metadata_startup_script = "#!/bin/bash\n echo 'Spoke PRD ${each.key} VM created!'"
-//  tags                    = ["spoke-prd-vm", "cli-vm"]
+  //  tags                    = ["spoke-prd-vm", "cli-vm"]
 }
 
 /*
