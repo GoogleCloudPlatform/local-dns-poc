@@ -3,8 +3,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may
- a copy of the License at
+ * You may a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -283,6 +282,59 @@ resource "google_compute_instance" "hub_dns_server_vms" {
   shielded_instance_config {
     enable_secure_boot = true
   }
+  /*metadata = {
+    startup-script = <<-EOT
+      #! /bin/bash
+      set -euo pipefail
+
+      # 1. Update and Upgrade the system packages
+      echo "Updating system packages..."
+      sudo apt-get update
+      sudo apt-get upgrade -y
+
+      # 2. Install BIND9 and utility packages
+      echo "Installing BIND9..."
+      sudo apt-get install -y bind9 bind9utils bind9-doc
+
+      # 3. Create the forward lookup zone file for acme.local
+      echo "Creating forward zone file /etc/bind/db.fwd.acme.local..."
+      sudo tee /etc/bind/db.fwd.acme.local > /dev/null <<'EOF'
+      ;
+      ; BIND data file for acme.local
+      ;
+      $TTL    604800
+      @       IN      SOA     acme.local. admin.acme.local. (
+                                   3         ; Serial
+                              604800         ; Refresh
+                               86400         ; Retry
+                             2419200         ; Expire
+                              604800 )       ; Negative Cache TTL
+      ;
+      @       IN      NS      dns1
+      @       IN      NS      dns2
+      dns1    IN      A       10.0.0.11
+      dns2    IN      A       10.0.0.12
+      www1    IN      A       10.0.0.21
+      EOF
+
+      # 4. Add the zone configuration to the BIND main configuration file
+      echo "Updating /etc/bind/named.conf.local with new zone..."
+      sudo tee -a /etc/bind/named.conf.local > /dev/null <<'EOF'
+
+      zone "acme.local" IN {
+        type master ;
+        file "/etc/bind/db.fwd.acme.local" ;
+        allow-update { none; } ;
+      } ;
+      EOF
+
+      # 5. Restart the BIND9 service to apply changes
+      echo "Restarting BIND9 service..."
+      sudo systemctl restart named.service
+
+      echo "DNS Server configuration complete."
+    EOT
+  } */
   metadata_startup_script = "#!/bin/bash\n echo 'Hub ${each.key} DNS VM created!'"
   //  tags                    = ["dns-server", "hub-vm"]
 }
@@ -386,7 +438,6 @@ resource "google_compute_instance" "spoke_dev_cli_vms" {
   shielded_instance_config {
     enable_secure_boot = true
   }
-
   metadata_startup_script = "#!/bin/bash\n echo 'Spoke DEV ${each.key} VM created!'"
   //tags                    = ["spoke-dev-vm", "cli-vm"]
 }

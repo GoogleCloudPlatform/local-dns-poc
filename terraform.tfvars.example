@@ -1,0 +1,85 @@
+# --------------------
+# Customer-Provided Values
+# --------------------
+# TODO: Customer must fill in these values before applying.
+
+organization_id = "779401413744"
+domain_name     = "acme.local"
+
+projects = {
+  "hub_project" = {
+    project_id = "gcp-prod-hub-1a2b"
+    apis = [
+      "compute.googleapis.com",
+      "dns.googleapis.com"
+      # Add any other specific APIs for the hub project here
+    ]
+  },
+  "spoke_prd_project" = {
+    project_id = "gcp-prod-spoke-3c4d"
+    apis = [
+      "compute.googleapis.com",
+      "dns.googleapis.com"
+      # Add any other specific APIs for the prod spoke project here
+    ]
+  },
+  "spoke_dev_project" = {
+    project_id = "gcp-dev-spoke-5e6f"
+    apis = [
+      "compute.googleapis.com",
+      "dns.googleapis.com"
+      # Add any other specific APIs for the dev spoke project here
+    ]
+  }
+}
+
+# --------------------
+# General Configuration (Can be adjusted if needed)
+# --------------------
+region = "us-central1"
+
+# VPC Names
+hub_vpc_name        = "hub-vpc-network"
+spoke_prd_vpc_name  = "spoke-prd-vpc-network"
+spoke_dev_vpc_name  = "spoke-dev-vpc-network"
+
+# Subnet Names
+hub_subnet_name     = "hub-subnet-01"
+spoke_prd_subnet_name = "spoke-prd-subnet-01"
+spoke_dev_subnet_name = "spoke-dev-subnet-01"
+
+# VMs Configurations
+instance_image            = "debian-cloud/debian-11"
+hub_vm_machine_type       = "e2-medium"
+spoke_prd_vm_machine_type = "e2-medium"
+spoke_dev_vm_machine_type = "e2-medium"
+
+spoke_prd_cli_vms = {
+  "vm-prd-cli1" = {
+    ip_address  = "10.1.0.31" 
+    zone_suffix = "a"
+  },
+  "vm-prd-cli2" = {
+    ip_address  = "10.1.0.32" 
+    zone_suffix = "b"
+  }
+}
+
+spoke_dev_cli_vms = {
+  "vm-dev-cli1" = {
+    ip_address  = "10.2.0.31" 
+    zone_suffix = "a"
+  },
+  "vm-dev-cli2" = {
+    ip_address  = "10.2.0.32"
+    zone_suffix = "b"
+  }
+}
+
+# DNS Configuration
+hub_dns_zone_name  = "forwarding-zone"
+dns_server_ips = {
+  "dns-01" = "10.0.0.11"
+  "dns-02" = "10.0.0.12"
+}
+
