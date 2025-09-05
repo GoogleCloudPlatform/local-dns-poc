@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+# Add this provider block to your main.tf, likely near the top
 
 # --------------------
 # 01-gcp-api-enablement
@@ -82,8 +83,7 @@ module "vpcs" {
   source     = "terraform-google-modules/network/google"
   version    = "11.1.1"
   for_each   = local.network_configs
-  depends_on = [google_project_service.apis] # Ensure APIs are enabled first
-
+  depends_on = [google_project_service.apis] # Ensure APIs are enabled first  
   project_id   = each.value.project_id
   network_name = each.value.network_name
   routing_mode = "GLOBAL"
@@ -150,7 +150,6 @@ resource "google_compute_router_nat" "nat_gateway" {
   name     = "${each.key}-nat-gateway-${var.region}"
   router   = each.value.name
   region   = each.value.region
-
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
   project                            = each.value.project
@@ -232,13 +231,18 @@ resource "google_compute_instance" "vm-hub-cli1" {
   network_interface {
     network    = module.vpcs["hub"].network_self_link
     subnetwork = module.vpcs["hub"].subnets["${var.region}/${var.hub_subnet_name}"].self_link
-    network_ip = "10.0.0.31"
+    network_ip = "10.0.0.31" // TBD: move to variables.tfvars
   }
   shielded_instance_config {
-    enable_secure_boot = true
+    enable_secure_boot = true // TBD: move to variables.tfvars
   }
   metadata_startup_script = "#!/bin/bash\n echo 'Hub Base VM created!'"
   //tags                    = ["http-server", "https-server", "hub-vm"]
+  params {
+    resource_manager_tags = {
+      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
+    }
+  }
 }
 
 resource "google_compute_instance" "vm-hub-www1" {
@@ -254,13 +258,19 @@ resource "google_compute_instance" "vm-hub-www1" {
   network_interface {
     network    = module.vpcs["hub"].network_self_link
     subnetwork = module.vpcs["hub"].subnets["${var.region}/${var.hub_subnet_name}"].self_link
-    network_ip = "10.0.0.21"
+    network_ip = "10.0.0.21" // TBD: move to variables.tfvars
   }
   shielded_instance_config {
-    enable_secure_boot = true
+    enable_secure_boot = true // TBD: move to variables.tfvars
   }
+  // TBD: Analyze if it is better to compile the commands onto a file or template
   metadata_startup_script = "#!/bin/bash\n sudo apt-get update && sudo apt-get install -y apache2 && echo 'Hello from Hub Web Server!' | sudo tee /var/www/html/index.html"
   //tags                    = ["http-server", "https-server", "web-server"]
+  params {
+    resource_manager_tags = {
+      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
+    }
+  }
 }
 
 resource "google_compute_instance" "hub_dns_server_vms" {
@@ -271,7 +281,7 @@ resource "google_compute_instance" "hub_dns_server_vms" {
   machine_type = var.hub_vm_machine_type
   boot_disk {
     initialize_params {
-      image = var.instance_image
+      image = var.instance_image 
     }
   }
   network_interface {
@@ -280,9 +290,10 @@ resource "google_compute_instance" "hub_dns_server_vms" {
     network_ip = each.value
   }
   shielded_instance_config {
-    enable_secure_boot = true
+    enable_secure_boot = true // TBD: move to variables.tfvars
   }
-  /*metadata = {
+    // TBD: Analyze if it is better to compile the commands onto a file or template
+  metadata = {
     startup-script = <<-EOT
       #! /bin/bash
       set -euo pipefail
@@ -334,33 +345,16 @@ resource "google_compute_instance" "hub_dns_server_vms" {
 
       echo "DNS Server configuration complete."
     EOT
-  } */
-  metadata_startup_script = "#!/bin/bash\n echo 'Hub ${each.key} DNS VM created!'"
+  }
+  //metadata_startup_script = "#!/bin/bash\n echo 'Hub ${each.key} DNS VM created!'"
   //  tags                    = ["dns-server", "hub-vm"]
-}
-/*
-resource "google_compute_instance" "spoke_prd_vms" {
-  for_each     = toset(["instance-01", "instance-02"])
-  project      = var.projects["spoke_prd_project"].project_id
-  zone         = "${var.region}-${each.key == "instance-01" ? "a" : "b"}"
-  name         = "spoke-prd-${each.key}"
-  machine_type = var.spoke_prd_vm_machine_type
-  boot_disk {
-    initialize_params {
-      image = var.instance_image
+  params {
+    resource_manager_tags = {
+      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
     }
   }
-  network_interface {
-    network    = module.vpcs["spoke_prd"].network_self_link
-    subnetwork = module.vpcs["spoke_prd"].subnets["${var.region}/${var.spoke_prd_subnet_name}"].self_link
-  }
-  shielded_instance_config {
-    enable_secure_boot = true
-  }
-  metadata_startup_script = "#!/bin/bash\n echo 'Spoke PRD ${each.key} VM created!'"
-  tags                    = ["spoke-prd-vm"]
 }
-*/
+
 
 
 resource "google_compute_instance" "spoke_prd_cli_vms" {
@@ -380,7 +374,7 @@ resource "google_compute_instance" "spoke_prd_cli_vms" {
   network_interface {
     network    = module.vpcs["spoke_prd"].network_self_link
     subnetwork = module.vpcs["spoke_prd"].subnets["${var.region}/${var.spoke_prd_subnet_name}"].self_link
-    network_ip = each.value.ip_address # Assigns the fixed IP
+    //network_ip = each.value.ip_address # Assigns the fixed IP
   }
 
   shielded_instance_config {
@@ -389,31 +383,13 @@ resource "google_compute_instance" "spoke_prd_cli_vms" {
 
   metadata_startup_script = "#!/bin/bash\n echo 'Spoke PRD ${each.key} VM created!'"
   //  tags                    = ["spoke-prd-vm", "cli-vm"]
-}
-
-/*
-resource "google_compute_instance" "spoke_dev_vms" {
-  for_each     = toset(["instance-01", "instance-02"])
-  project      = var.projects["spoke_dev_project"].project_id
-  zone         = "${var.region}-${each.key == "instance-01" ? "a" : "b"}"
-  name         = "spoke-dev-${each.key}"
-  machine_type = var.spoke_dev_vm_machine_type
-  boot_disk {
-    initialize_params {
-      image = var.instance_image
+  params {
+    resource_manager_tags = {
+      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
     }
   }
-  network_interface {
-    network    = module.vpcs["spoke_dev"].network_self_link
-    subnetwork = module.vpcs["spoke_dev"].subnets["${var.region}/${var.spoke_dev_subnet_name}"].self_link
-  }
-  shielded_instance_config {
-    enable_secure_boot = true
-  }
-  metadata_startup_script = "#!/bin/bash\n echo 'Spoke DEV ${each.key} VM created!'"
-  tags                    = ["spoke-dev-vm"]
 }
-*/
+
 
 resource "google_compute_instance" "spoke_dev_cli_vms" {
   for_each = var.spoke_dev_cli_vms
@@ -432,7 +408,7 @@ resource "google_compute_instance" "spoke_dev_cli_vms" {
   network_interface {
     network    = module.vpcs["spoke_dev"].network_self_link
     subnetwork = module.vpcs["spoke_dev"].subnets["${var.region}/${var.spoke_dev_subnet_name}"].self_link
-    network_ip = each.value.ip_address # Assigns the fixed IP
+    //network_ip = each.value.ip_address # Assigns the fixed IP
   }
 
   shielded_instance_config {
@@ -440,8 +416,12 @@ resource "google_compute_instance" "spoke_dev_cli_vms" {
   }
   metadata_startup_script = "#!/bin/bash\n echo 'Spoke DEV ${each.key} VM created!'"
   //tags                    = ["spoke-dev-vm", "cli-vm"]
+  params {
+    resource_manager_tags = {
+      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
+    }
+  }
 }
-
 
 
 # --------------------
@@ -465,45 +445,60 @@ locals {
 }
 
 resource "google_tags_tag_key" "environment_tag_key" {
-  provider    = google-beta
   parent      = "organizations/${var.organization_id}"
   short_name  = "environment"
   description = "Environment for the resource (e.g., prd, dev)"
   purpose     = "GCE_FIREWALL"
-  purpose_data = {
+  /*purpose_data = {
     network = "${var.projects["hub_project"].project_id}/${var.hub_vpc_name}"
+  }*/
+  purpose_data = {
+    organization = "auto"
   }
   depends_on = [google_project_service.apis]
 }
 
 resource "google_tags_tag_key" "application_role_tag_key" {
-  provider    = google-beta
   parent      = "organizations/${var.organization_id}"
   short_name  = "app-role"
   description = "Role of the application (e.g., web-server, dns-server)"
   purpose     = "GCE_FIREWALL"
   purpose_data = {
-    network = "${var.projects["hub_project"].project_id}/${var.hub_vpc_name}"
+    organization = "auto"
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_tags_tag_key" "security_role_tag_key" {
+  parent      = "organizations/${var.organization_id}"
+  short_name  = "security-role"
+  description = "Defines a specific security purpose for a resource"
+  purpose     = "GCE_FIREWALL"
+  purpose_data = {
+    organization = "auto"
   }
   depends_on = [google_project_service.apis]
 }
 
 resource "google_tags_tag_value" "env_prd_tag_value" {
-  provider    = google-beta
   parent      = google_tags_tag_key.environment_tag_key.id
   short_name  = "prd"
   description = "Production Environment"
 }
 
 resource "google_tags_tag_value" "app_web_server_tag_value" {
-  provider    = google-beta
   parent      = google_tags_tag_key.application_role_tag_key.id
   short_name  = "web-server"
   description = "Web Server Role"
 }
 
+resource "google_tags_tag_value" "ssh_via_iap_tag_value" {
+  parent      = google_tags_tag_key.security_role_tag_key.id
+  short_name  = "ssh-via-iap"
+  description = "Allows SSH ingress from the Google IAP proxy service"
+}
+
 resource "google_compute_network_firewall_policy" "project_policies" {
-  provider    = google-beta
   for_each    = local.project_firewall_configs
   project     = each.value.project_id
   name        = "${each.key}-firewall-policy"
@@ -519,8 +514,32 @@ resource "google_compute_network_firewall_policy_association" "project_policy_as
   firewall_policy   = google_compute_network_firewall_policy.project_policies[each.key].name
 }
 
+resource "google_compute_network_firewall_policy_rule" "allow_ssh_via_iap" {
+  for_each        = local.project_firewall_configs
+  project         = each.value.project_id
+  firewall_policy = google_compute_network_firewall_policy.project_policies[each.key].name
+  rule_name       = "allow-ssh-via-iap"
+  priority        = 990 # High priority
+  direction       = "INGRESS"
+  action          = "allow"
+  description     = "Allow TCP:22 for SSH from Google's IAP service."
+
+  match {
+    layer4_configs {
+      ip_protocol = "tcp"
+      ports       = ["22"]
+    }
+    # This is the specific IP range used by Google for IAP TCP forwarding.
+    src_ip_ranges = ["35.235.240.0/20"]
+  }
+
+  # This targets the rule to any VM with the "ssh-via-iap" secure tag.
+  target_secure_tags {
+    name = google_tags_tag_value.ssh_via_iap_tag_value.id
+  }
+}
+
 resource "google_compute_network_firewall_policy_rule" "allow_http_https_to_web_servers" {
-  provider        = google-beta
   for_each        = local.project_firewall_configs
   project         = each.value.project_id
   firewall_policy = google_compute_network_firewall_policy.project_policies[each.key].name
@@ -547,7 +566,6 @@ resource "google_compute_network_firewall_policy_rule" "allow_http_https_to_web_
 }
 
 resource "google_compute_network_firewall_policy_rule" "allow_spoke_to_dns_servers" {
-  provider        = google-beta
   for_each        = local.project_firewall_configs
   project         = each.value.project_id
   firewall_policy = google_compute_network_firewall_policy.project_policies[each.key].name
@@ -572,3 +590,4 @@ resource "google_compute_network_firewall_policy_rule" "allow_spoke_to_dns_serve
     ]
   }
 }
+
