@@ -80,10 +80,10 @@ locals {
 }
 
 module "vpcs" {
-  source     = "terraform-google-modules/network/google"
-  version    = "11.1.1"
-  for_each   = local.network_configs
-  depends_on = [google_project_service.apis] # Ensure APIs are enabled first  
+  source       = "terraform-google-modules/network/google"
+  version      = "11.1.1"
+  for_each     = local.network_configs
+  depends_on   = [google_project_service.apis] # Ensure APIs are enabled first  
   project_id   = each.value.project_id
   network_name = each.value.network_name
   routing_mode = "GLOBAL"
@@ -146,10 +146,10 @@ resource "google_compute_router" "nat_router" {
 }
 
 resource "google_compute_router_nat" "nat_gateway" {
-  for_each = google_compute_router.nat_router
-  name     = "${each.key}-nat-gateway-${var.region}"
-  router   = each.value.name
-  region   = each.value.region
+  for_each                           = google_compute_router.nat_router
+  name                               = "${each.key}-nat-gateway-${var.region}"
+  router                             = each.value.name
+  region                             = each.value.region
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
   project                            = each.value.project
@@ -162,7 +162,71 @@ resource "google_compute_router_nat" "nat_gateway" {
 # --------------------
 # 05-cloud-dns
 # --------------------
-resource "google_dns_managed_zone" "hub_forwarding_zone" {
+
+
+locals {
+  spoke_configs = {
+    "prd" = {
+      project_id    = var.projects["spoke_prd_project"].project_id
+      vpc_self_link = module.vpcs["spoke_prd"].network_self_link
+    },
+    "dev" = {
+      project_id    = var.projects["spoke_dev_project"].project_id
+      vpc_self_link = module.vpcs["spoke_dev"].network_self_link
+    },
+  }
+}
+
+
+# "Catch-all" forwarding zone for the root domain (.).
+# This forwards all non-matching queries to the central BIND servers.
+resource "google_dns_managed_zone" "hub_root_forwarding_zone" {
+  project     = var.projects["hub_project"].project_id
+  name        = "hub-root-forwarding-zone"
+  dns_name    = "."
+  description = "Hub forwarding zone for the root domain to central BIND servers."
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = module.vpcs["hub"].network_self_link
+    }
+  }
+
+  forwarding_config {
+    dynamic "target_name_servers" {
+      for_each = var.dns_server_ips
+      content {
+        ipv4_address = target_name_servers.value
+      }
+    }
+  }
+}
+
+# Peering for the root (.) forwarding zone.
+# This allows the spokes to use the hub's "catch-all" rule.
+resource "google_dns_managed_zone" "spoke_root_peering_zone" {
+  for_each = local.spoke_configs
+
+  project     = each.value.project_id
+  name        = "spoke-root-peering-zone-${each.key}"
+  dns_name    = "."
+  description = "Spoke ${each.key} peering to Hub's root forwarding zone."
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = each.value.vpc_self_link
+    }
+  }
+
+  peering_config {
+    target_network {
+      network_url = module.vpcs["hub"].network_self_link
+    }
+  }
+}
+/*resource "google_dns_managed_zone" "hub_forwarding_zone" {
   project     = var.projects["hub_project"].project_id
   name        = var.hub_dns_zone_name
   dns_name    = "${var.domain_name}."
@@ -195,7 +259,107 @@ locals {
     },
   }
 }
+*/
+/*
 
+resource "google_dns_managed_zone" "private_zone_googleapis" {
+  project     = var.projects["hub_project"].project_id
+  name        = "prv-zone-googleapis-com"
+  dns_name    = "googleapis.com."
+  description = "Private zone for googleapis.com"
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = module.vpcs["hub"].network_self_link
+    }
+  }
+}
+
+resource "google_dns_managed_zone" "prv_fwd_gcp_acme_local" {
+  project     = var.projects["hub_project"].project_id
+  name        = "prv-fwd-gcp-acme-local"
+  dns_name    = "gcp.${var.domain_name}." //TBD to move to variables.tf
+  description = "Private forwarding zone for gcp resources."
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = module.vpcs["hub"].network_self_link
+    }
+  }
+
+  forwarding_config {
+    dynamic "target_name_servers" {
+      for_each = var.dns_server_ips //TBD
+      content {
+        ipv4_address = target_name_servers.value
+      }
+    }
+  }
+}
+
+# Peering for the googleapis.com zone
+resource "google_dns_managed_zone" "spoke_peering_zone_googleapis" {
+  for_each    = local.spoke_configs
+  project     = each.value.project_id
+  name        = "googleapis-com-${each.key}-peering"
+  dns_name    = "googleapis.com."
+  description = "Spoke ${each.key} peering zone to Hub for googleapis.com"
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = each.value.vpc_self_link
+    }
+  }
+
+  peering_config {
+    target_network {
+      network_url = module.vpcs["hub"].network_self_link
+    }
+  }
+}
+
+# Peering for the gcp.acme.local zone
+resource "google_dns_managed_zone" "spoke_peering_zone_gcp_acme_local" {
+  for_each    = local.spoke_configs
+  project     = each.value.project_id
+  name        = "gcp-acme-local-${each.key}-peering"
+  dns_name    = "gcp.acme.local."
+  description = "Spoke ${each.key} peering zone to Hub for gcp.acme.local"
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = each.value.vpc_self_link
+    }
+  }
+
+  peering_config {
+    target_network {
+      network_url = module.vpcs["hub"].network_self_link
+    }
+  }
+}
+
+# Private zone for gcp.acme.local.
+# This is required so the BIND servers have a target to forward to.
+resource "google_dns_managed_zone" "prv_zone_gcp_acme_local" {
+  project     = var.projects["hub_project"].project_id
+  name        = "prv-zone-gcp-acme-local"
+  dns_name    = "gcp.${var.domain_name}." # Assumes var.domain_name is "acme.local"
+  description = "Private zone for gcp.acme.local, managed by Cloud DNS."
+  visibility  = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = module.vpcs["hub"].network_self_link
+    }
+  }
+}
+
+/*
 resource "google_dns_managed_zone" "spoke_peering_zone" {
   for_each    = local.spoke_configs
   project     = each.value.project_id
@@ -214,10 +378,13 @@ resource "google_dns_managed_zone" "spoke_peering_zone" {
     }
   }
 }
+*/
 
 # --------------------
 # 06-gce-vms
 # --------------------
+
+
 resource "google_compute_instance" "vm-hub-cli1" {
   project      = var.projects["hub_project"].project_id
   zone         = "${var.region}-a"
@@ -258,10 +425,10 @@ resource "google_compute_instance" "vm-hub-www1" {
   network_interface {
     network    = module.vpcs["hub"].network_self_link
     subnetwork = module.vpcs["hub"].subnets["${var.region}/${var.hub_subnet_name}"].self_link
-    network_ip = "10.0.0.21" // TBD: move to variables.tfvars
+    network_ip = var.hub_www1_ip // TBD: move to variables.tf - DONE
   }
   shielded_instance_config {
-    enable_secure_boot = true // TBD: move to variables.tfvars
+    enable_secure_boot = var.enable_secure_boot // TBD: move to variables.tf - DONE
   }
   // TBD: Analyze if it is better to compile the commands onto a file or template
   metadata_startup_script = "#!/bin/bash\n sudo apt-get update && sudo apt-get install -y apache2 && echo 'Hello from Hub Web Server!' | sudo tee /var/www/html/index.html"
@@ -273,15 +440,35 @@ resource "google_compute_instance" "vm-hub-www1" {
   }
 }
 
+locals {
+  # --- Records for the acme.local zone ---
+  acme_ns_records = join("\n", [
+    for name, ip in var.dns_server_ips : "@       IN      NS      ${name}"
+  ])
+  acme_a_records = join("\n", [
+    for name, ip in var.dns_server_ips : "${name}    IN      A       ${ip}"
+  ])
+
+  # --- Records for the googleapis.com zone ---
+  googleapis_ns_records = join("\n", [
+    for name, ip in var.dns_server_ips : "@       IN      NS      ${name}"
+  ])
+  # These are the "glue" records needed so the nameservers can be resolved.
+  googleapis_a_records = join("\n", [
+    for name, ip in var.dns_server_ips : "${name}    IN      A       ${ip}"
+  ])
+}
+
+
 resource "google_compute_instance" "hub_dns_server_vms" {
   for_each     = var.dns_server_ips
   project      = var.projects["hub_project"].project_id
-  zone         = "${var.region}-${each.key == "dns-01" ? "a" : "b"}"
-  name         = "hub-${each.key}-vm"
+  zone         = "${var.region}-${each.key == "vm-hub-dns1" ? "a" : "b"}"
+  name         = each.key
   machine_type = var.hub_vm_machine_type
   boot_disk {
     initialize_params {
-      image = var.instance_image 
+      image = var.instance_image
     }
   }
   network_interface {
@@ -290,61 +477,109 @@ resource "google_compute_instance" "hub_dns_server_vms" {
     network_ip = each.value
   }
   shielded_instance_config {
-    enable_secure_boot = true // TBD: move to variables.tfvars
+    enable_secure_boot = var.enable_secure_boot // TBD: move to variables.tf - DONE
   }
-    // TBD: Analyze if it is better to compile the commands onto a file or template
+  // TBD: Analyze if it is better to compile the commands onto a file or template
   metadata = {
-    startup-script = <<-EOT
+    startup-script = <<-EOF
       #! /bin/bash
       set -euo pipefail
 
-      # 1. Update and Upgrade the system packages
-      echo "Updating system packages..."
+      # --- Idempotency Check ---
+      # If the main BIND zone file exists, assume configuration is complete and exit.
+      if [ -f /etc/bind/db.fwd.${var.domain_name} ]; then
+        echo "BIND zone file /etc/bind/db.fwd.${var.domain_name} already exists. Exiting."
+        exit 0
+      fi
+
+      # --- BIND9 Configuration ---
+      # 1. System updates and package installation
+      echo "Updating and installing packages..."
       sudo apt-get update
       sudo apt-get upgrade -y
-
-      # 2. Install BIND9 and utility packages
-      echo "Installing BIND9..."
       sudo apt-get install -y bind9 bind9utils bind9-doc
 
-      # 3. Create the forward lookup zone file for acme.local
-      echo "Creating forward zone file /etc/bind/db.fwd.acme.local..."
-      sudo tee /etc/bind/db.fwd.acme.local > /dev/null <<'EOF'
-      ;
-      ; BIND data file for acme.local
-      ;
-      $TTL    604800
-      @       IN      SOA     acme.local. admin.acme.local. (
-                                   3         ; Serial
-                              604800         ; Refresh
-                               86400         ; Retry
-                             2419200         ; Expire
-                              604800 )       ; Negative Cache TTL
-      ;
-      @       IN      NS      dns1
-      @       IN      NS      dns2
-      dns1    IN      A       10.0.0.11
-      dns2    IN      A       10.0.0.12
+      # 2. Configure BIND9 global options for recursion
+      echo "Configuring BIND9 global options..."
+      sudo tee /etc/bind/named.conf.options > /dev/null <<EOT
+      options {
+        directory "/var/cache/bind";
+        forwarders { 8.8.8.8; 8.8.4.4; };
+        forward only;
+        allow-query { any; };
+        recursion yes;
+        dnssec-validation auto;
+        listen-on-v6 { any; };
+      };
+      EOT
+
+      # 3. Create the authoritative zone file for the customer domain
+      echo "Creating authoritative zone file for ${var.domain_name}..."
+      sudo tee /etc/bind/db.fwd.${var.domain_name} > /dev/null <<EOT
+      ; BIND data file for ${var.domain_name}
+      \$TTL    604800
+      @       IN      SOA     ${var.domain_name}. admin.${var.domain_name}. ( 3 604800 86400 2419200 604800 )
+      
+      ; Name Server records for ${var.domain_name}
+      ${local.acme_ns_records}
+
+      ; Glue records for ${var.domain_name} nameservers
+      ${local.acme_a_records}
+
+      ; Other records for the zone
       www1    IN      A       10.0.0.21
-      EOF
+      EOT
 
-      # 4. Add the zone configuration to the BIND main configuration file
-      echo "Updating /etc/bind/named.conf.local with new zone..."
-      sudo tee -a /etc/bind/named.conf.local > /dev/null <<'EOF'
+      # 4. Create the new authoritative zone file for googleapis.com
+      echo "Creating authoritative zone file for googleapis.com..."
+      sudo tee /etc/bind/db.googleapis.com > /dev/null <<EOT
+      ; BIND data file for googleapis.com
+      \$TTL    300
+      @       IN      SOA     googleapis.com. admin.googleapis.com. ( 1 3600 600 86400 300 )
 
-      zone "acme.local" IN {
-        type master ;
-        file "/etc/bind/db.fwd.acme.local" ;
-        allow-update { none; } ;
-      } ;
-      EOF
+      ; Name Server records for googleapis.com
+      ${local.googleapis_ns_records}
 
-      # 5. Restart the BIND9 service to apply changes
+      ; Glue records for googleapis.com nameservers
+      ${local.googleapis_a_records}
+      
+      ; A records for restricted and private access
+      restricted  IN  A   199.36.153.4
+      restricted  IN  A   199.36.153.5
+      restricted  IN  A   199.36.153.6
+      restricted  IN  A   199.36.153.7
+      private     IN  A   199.36.153.8
+      private     IN  A   199.36.153.9
+      private     IN  A   199.36.153.10
+      private     IN  A   199.36.153.11
+      
+      ; Wildcard CNAME that points all other subdomains to private.googleapis.com
+      *           IN  CNAME   private.googleapis.com.
+      EOT
+
+      # 5. Configure local zones
+      echo "Configuring local BIND zones..."
+      sudo tee /etc/bind/named.conf.local > /dev/null <<EOT
+      // Authoritative Zone for ${var.domain_name}
+      zone "${var.domain_name}" IN {
+        type master;
+        file "/etc/bind/db.fwd.${var.domain_name}";
+      };
+
+      // Authoritative Zone for googleapis.com
+      zone "googleapis.com" IN {
+        type master;
+        file "/etc/bind/db.googleapis.com";
+      };
+      EOT
+
+      # 6. Restart BIND9 to apply all changes
       echo "Restarting BIND9 service..."
       sudo systemctl restart named.service
+      
+      echo "BIND9 configuration complete."
 
-      echo "DNS Server configuration complete."
-    EOT
+    EOF
   }
   //metadata_startup_script = "#!/bin/bash\n echo 'Hub ${each.key} DNS VM created!'"
   //  tags                    = ["dns-server", "hub-vm"]
@@ -356,7 +591,7 @@ resource "google_compute_instance" "hub_dns_server_vms" {
 }
 
 
-
+/*
 resource "google_compute_instance" "spoke_prd_cli_vms" {
   for_each = var.spoke_prd_cli_vms
 
@@ -389,8 +624,125 @@ resource "google_compute_instance" "spoke_prd_cli_vms" {
     }
   }
 }
+*/
 
+resource "google_compute_instance" "spoke_prd_cli_vms" {
+  for_each = var.spoke_prd_cli_vms
 
+  project      = var.projects["spoke_prd_project"].project_id
+  zone         = "${var.region}-${each.value.zone_suffix}"
+  name         = each.key
+  machine_type = var.spoke_prd_vm_machine_type
+
+  boot_disk {
+    initialize_params {
+      image = var.instance_image
+    }
+  }
+
+  network_interface {
+    network    = module.vpcs["spoke_prd"].network_self_link
+    subnetwork = module.vpcs["spoke_prd"].subnets["${var.region}/${var.spoke_prd_subnet_name}"].self_link
+  }
+
+  shielded_instance_config {
+    enable_secure_boot = true
+  }
+
+  metadata_startup_script = <<-EOF
+    #! /bin/bash
+    set -euo pipefail
+    
+    # Check if this is the target VM for custom DNS
+    if [[ "$(hostname)" == "vm-prd-cli2" ]]; then
+      echo "Customizing DNS for $(hostname)..."
+      
+      # Idempotency check: exit if already configured
+      if grep -q "10.0.0.11" /etc/dhcp/dhclient.conf; then
+        echo "Custom DNS already configured. Exiting."
+        exit 0
+      fi
+      
+      # Prepend the BIND servers to the DHCP client configuration
+      echo "prepend domain-name-servers 10.0.0.11, 10.0.0.12;" | sudo tee -a /etc/dhcp/dhclient.conf
+      
+      # Renew the DHCP lease to apply the change immediately
+      echo "Renewing DHCP lease to update /etc/resolv.conf..."
+      sudo dhclient -r && sudo dhclient
+      
+      echo "DNS for $(hostname) now points to 10.0.0.11 and 10.0.0.12."
+      
+    else
+      echo "Spoke PRD VM $(hostname) created with default VPC DNS."
+    fi
+    EOF
+
+  params {
+    resource_manager_tags = {
+      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
+    }
+  }
+}
+
+resource "google_compute_instance" "spoke_dev_cli_vms" {
+  for_each = var.spoke_dev_cli_vms
+
+  project      = var.projects["spoke_dev_project"].project_id
+  zone         = "${var.region}-${each.value.zone_suffix}"
+  name         = each.key
+  machine_type = var.spoke_dev_vm_machine_type
+
+  boot_disk {
+    initialize_params {
+      image = var.instance_image
+    }
+  }
+
+  network_interface {
+    network    = module.vpcs["spoke_dev"].network_self_link
+    subnetwork = module.vpcs["spoke_dev"].subnets["${var.region}/${var.spoke_dev_subnet_name}"].self_link
+  }
+
+  shielded_instance_config {
+    enable_secure_boot = true
+  }
+
+  metadata_startup_script = <<-EOF
+    #! /bin/bash
+    set -euo pipefail
+    
+    # Check if this is the target VM for custom DNS
+    if [[ "$(hostname)" == "vm-dev-cli2" ]]; then
+      echo "Customizing DNS for $(hostname)..."
+      
+      # Idempotency check: exit if already configured
+      if grep -q "10.0.0.11" /etc/dhcp/dhclient.conf; then
+        echo "Custom DNS already configured. Exiting."
+        exit 0
+      fi
+      
+      # Prepend the BIND servers to the DHCP client configuration
+      echo "prepend domain-name-servers 10.0.0.11, 10.0.0.12;" | sudo tee -a /etc/dhcp/dhclient.conf
+      
+      # Renew the DHCP lease to apply the change immediately
+      echo "Renewing DHCP lease to update /etc/resolv.conf..."
+      sudo dhclient -r && sudo dhclient
+      
+      echo "DNS for $(hostname) now points to 10.0.0.11 and 10.0.0.12."
+      
+    else
+      echo "Spoke DEV VM $(hostname) created with default VPC DNS."
+    fi
+    EOF
+
+  params {
+    resource_manager_tags = {
+      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
+    }
+  }
+}
+
+/*
 resource "google_compute_instance" "spoke_dev_cli_vms" {
   for_each = var.spoke_dev_cli_vms
 
@@ -422,7 +774,7 @@ resource "google_compute_instance" "spoke_dev_cli_vms" {
     }
   }
 }
-
+*/
 
 # --------------------
 # 07-firewall-rules

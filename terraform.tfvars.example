@@ -39,12 +39,12 @@ projects = {
 region = "us-central1"
 
 # VPC Names
-hub_vpc_name        = "hub-vpc-network"
-spoke_prd_vpc_name  = "spoke-prd-vpc-network"
-spoke_dev_vpc_name  = "spoke-dev-vpc-network"
+hub_vpc_name       = "hub-vpc"
+spoke_prd_vpc_name = "spoke-prd-vpc"
+spoke_dev_vpc_name = "spoke-dev-vpc"
 
 # Subnet Names
-hub_subnet_name     = "hub-subnet-01"
+hub_subnet_name       = "hub-subnet-01"
 spoke_prd_subnet_name = "spoke-prd-subnet-01"
 spoke_dev_subnet_name = "spoke-dev-subnet-01"
 
@@ -56,18 +56,18 @@ spoke_dev_vm_machine_type = "e2-medium"
 
 spoke_prd_cli_vms = {
   "vm-prd-cli1" = {
-    ip_address  = "10.1.0.31" 
+    ip_address  = "10.1.0.31"
     zone_suffix = "a"
   },
   "vm-prd-cli2" = {
-    ip_address  = "10.1.0.32" 
+    ip_address  = "10.1.0.32"
     zone_suffix = "b"
   }
 }
 
 spoke_dev_cli_vms = {
   "vm-dev-cli1" = {
-    ip_address  = "10.2.0.31" 
+    ip_address  = "10.2.0.31"
     zone_suffix = "a"
   },
   "vm-dev-cli2" = {
@@ -75,11 +75,11 @@ spoke_dev_cli_vms = {
     zone_suffix = "b"
   }
 }
+dns_server_ips = {
+  "vm-hub-dns1" = "10.0.0.11"
+  "vm-hub-dns2" = "10.0.0.12"
+}
 
 # DNS Configuration
-hub_dns_zone_name  = "forwarding-zone"
-dns_server_ips = {
-  "dns-01" = "10.0.0.11"
-  "dns-02" = "10.0.0.12"
-}
+//hub_dns_zone_name = "forwarding-zone"
 

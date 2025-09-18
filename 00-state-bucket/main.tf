@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+
 resource "google_storage_bucket" "terraform_state_bucket" {
   name          = var.gcs_bucket_name
   project       = var.gcs_bucket_project_id

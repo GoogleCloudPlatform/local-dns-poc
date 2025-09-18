@@ -51,7 +51,7 @@ variable "region" {
 variable "hub_vpc_name" {
   description = "The name for the Hub VPC network."
   type        = string
-  default     = "hub-vpc-network"
+  default     = "hub-vpc"
 }
 
 variable "hub_subnet_name" {
@@ -69,7 +69,7 @@ variable "hub_subnet_ip" {
 variable "spoke_prd_vpc_name" {
   description = "The name for the Spoke PRD VPC network."
   type        = string
-  default     = "spoke-prd-vpc-network"
+  default     = "spoke-prd-vpc"
 }
 
 variable "spoke_prd_subnet_name" {
@@ -87,7 +87,7 @@ variable "spoke_prd_subnet_ip" {
 variable "spoke_dev_vpc_name" {
   description = "The name for the Spoke DEV VPC network."
   type        = string
-  default     = "spoke-dev-vpc-network"
+  default     = "spoke-dev-vpc"
 }
 
 variable "spoke_dev_subnet_name" {
@@ -126,6 +126,18 @@ variable "spoke_dev_vm_machine_type" {
   default     = "e2-small"
 }
 
+variable "enable_secure_boot" {
+  description = "If true, enables Secure Boot on Shielded VM instances."
+  type        = bool
+  default     = true
+}
+
+variable "hub_www1_ip" {
+  description = "The internal IP address for the vm-hub-www1 instance."
+  type        = string
+  default     = "10.0.0.21"
+}
+
 # --------------------
 # DNS Configuration
 # --------------------
@@ -139,8 +151,8 @@ variable "dns_server_ips" {
   description = "A map of DNS server identifiers to their fixed internal IP addresses."
   type        = map(string)
   default = {
-    "dns-01" = "10.0.0.11"
-    "dns-02" = "10.0.0.12"
+    "vm-hub-dns1" = "10.0.0.11"
+    "vm-hub-dns2" = "10.0.0.12"
   }
 }
 
