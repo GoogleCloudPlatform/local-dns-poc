@@ -3,8 +3,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may
- a copy of the License at
+ * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -16,8 +15,19 @@
  */
 
 terraform {
-  backend "gcs" {
-    bucket = "UPDATE_ME"
-    prefix = "terraform/state"
+  required_version = ">= 1.3"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">= 4.64, < 8"
+    }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = ">= 4.64, < 8"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = "0.9.1"
+    }
   }
 }

@@ -3,8 +3,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may
- a copy of the License at
+ * You may a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -15,9 +14,7 @@
  * limitations under the License.
  */
 
-terraform {
-  backend "gcs" {
-    bucket = "UPDATE_ME"
-    prefix = "terraform/state"
-  }
-}
+gcs_bucket_name          = "my-tf-gcs-bucket"
+gcs_bucket_project_id    = "local-dns-poc-prj-id"
+gcs_bucket_location      = "us-central1"
+gcs_bucket_storage_class = "standard"

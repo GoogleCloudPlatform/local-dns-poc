@@ -28,7 +28,7 @@ variable "gcs_bucket_project_id" {
 variable "gcs_bucket_location" {
   description = "The location (region or multi-region) for the GCS bucket (e.g., 'US', 'europe-west1')."
   type        = string
-  default     = "US-CENTRAL1"
+  default     = "us-central1"
 }
 
 variable "gcs_bucket_storage_class" {

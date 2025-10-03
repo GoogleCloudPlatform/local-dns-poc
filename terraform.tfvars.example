@@ -1,14 +1,28 @@
-# --------------------
-# Customer-Provided Values
-# --------------------
-# TODO: Customer must fill in these values before applying.
+/**
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-organization_id = "779401413744"
+organization_id = "123456789012"
 domain_name     = "acme.local"
 
+# --------------------
+# Projects Configuration
+# --------------------
 projects = {
   "hub_project" = {
-    project_id = "gcp-prod-hub-1a2b"
+    project_id = "prj-hub-local-dns"
     apis = [
       "compute.googleapis.com",
       "dns.googleapis.com"
@@ -16,7 +30,7 @@ projects = {
     ]
   },
   "spoke_prd_project" = {
-    project_id = "gcp-prod-spoke-3c4d"
+    project_id = "prj-prd-local-dns"
     apis = [
       "compute.googleapis.com",
       "dns.googleapis.com"
@@ -24,7 +38,7 @@ projects = {
     ]
   },
   "spoke_dev_project" = {
-    project_id = "gcp-dev-spoke-5e6f"
+    project_id = "prj-dev-local-dns"
     apis = [
       "compute.googleapis.com",
       "dns.googleapis.com"
@@ -54,6 +68,7 @@ hub_vm_machine_type       = "e2-medium"
 spoke_prd_vm_machine_type = "e2-medium"
 spoke_dev_vm_machine_type = "e2-medium"
 
+# Spoke PRD VMs setup
 spoke_prd_cli_vms = {
   "vm-prd-cli1" = {
     ip_address  = "10.1.0.31"
@@ -65,6 +80,7 @@ spoke_prd_cli_vms = {
   }
 }
 
+# Spoke DEV VMs setup
 spoke_dev_cli_vms = {
   "vm-dev-cli1" = {
     ip_address  = "10.2.0.31"
@@ -75,11 +91,32 @@ spoke_dev_cli_vms = {
     zone_suffix = "b"
   }
 }
-dns_server_ips = {
-  "vm-hub-dns1" = "10.0.0.11"
-  "vm-hub-dns2" = "10.0.0.12"
+
+# Hub VMs setup
+hub_cli1_vm = {
+  ip_address  = "10.0.0.31"
+  zone_suffix = "a"
+}
+hub_www1_vm = {
+  ip_address  = "10.0.0.21"
+  zone_suffix = "b"
 }
 
+# --------------------
 # DNS Configuration
-//hub_dns_zone_name = "forwarding-zone"
+# --------------------
 
+# Cloud DNS 
+hub_dns_zone_name  = "forwarding-zone"
+
+# Local DNS servers
+dns_server_vms =  {
+  "vm-hub-dns1" = { 
+    ip_address = "10.0.0.11" 
+    zone_suffix = "a" 
+  }
+  "vm-hub-dns2" = { 
+    ip_address = "10.0.0.12"
+    zone_suffix = "b" 
+  }
+}

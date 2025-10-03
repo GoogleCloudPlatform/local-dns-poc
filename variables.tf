@@ -15,9 +15,6 @@
  * limitations under the License.
  */
 
-# --------------------
-# Provider Configuration
-# --------------------
 variable "organization_id" {
   description = "The ID of the GCP organization (e.g., '123456789012')."
   type        = string
@@ -28,9 +25,6 @@ variable "domain_name" {
   type        = string
 }
 
-# --------------------
-# Project Configuration
-# --------------------
 variable "projects" {
   description = "A map of logical project names to their details, including the actual GCP project ID and a list of APIs to enable."
   type = map(object({
@@ -39,9 +33,6 @@ variable "projects" {
   }))
 }
 
-# --------------------
-# Network & Compute Configuration
-# --------------------
 variable "region" {
   description = "The GCP region for the subnets and VMs."
   type        = string
@@ -132,27 +123,27 @@ variable "enable_secure_boot" {
   default     = true
 }
 
-variable "hub_www1_ip" {
-  description = "The internal IP address for the vm-hub-www1 instance."
-  type        = string
-  default     = "10.0.0.21"
-}
-
-# --------------------
-# DNS Configuration
-# --------------------
-variable "hub_dns_zone_name" {
-  description = "The name for the Hub's private forwarding DNS zone."
-  type        = string
-  default     = "onprem-forwarder"
-}
-
-variable "dns_server_ips" {
-  description = "A map of DNS server identifiers to their fixed internal IP addresses."
-  type        = map(string)
+variable "hub_cli1_vm" {
+  description = "Configuration for the vm-hub-cli1 instance."
+  type = object({
+    ip_address  = string
+    zone_suffix = string
+  })
   default = {
-    "vm-hub-dns1" = "10.0.0.11"
-    "vm-hub-dns2" = "10.0.0.12"
+    ip_address  = "10.0.0.31"
+    zone_suffix = "a"
+  }
+}
+
+variable "hub_www1_vm" {
+  description = "Configuration for the vm-hub-www1 instance."
+  type = object({
+    ip_address  = string
+    zone_suffix = string
+  })
+  default = {
+    ip_address  = "10.0.0.21"
+    zone_suffix = "b"
   }
 }
 
@@ -172,4 +163,22 @@ variable "spoke_dev_cli_vms" {
     zone_suffix = string
   }))
   default = {}
+}
+
+variable "hub_dns_zone_name" {
+  description = "The name for the Hub's private forwarding DNS zone."
+  type        = string
+  default     = "onprem-forwarder"
+}
+
+variable "dns_server_vms" {
+  description = "A map of DNS server identifiers to their fixed internal IP addresses."
+  type = map(object({
+    ip_address  = string
+    zone_suffix = string
+  }))
+  default = {
+    "vm-hub-dns1" = { ip_address = "10.0.0.11", zone_suffix = "a" }
+    "vm-hub-dns2" = { ip_address = "10.0.0.12", zone_suffix = "b" }
+  }
 }
