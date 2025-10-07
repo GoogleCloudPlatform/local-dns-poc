@@ -63,7 +63,8 @@ resource "google_compute_instance" "vm-hub-www1" {
   metadata_startup_script = "#!/bin/bash\n sudo apt-get update && sudo apt-get install -y apache2 && echo 'Hello from Hub Web Server!' | sudo tee /var/www/html/index.html"
   params {
     resource_manager_tags = {
-      (google_tags_tag_key.security_role_tag_key.id) = google_tags_tag_value.ssh_via_iap_tag_value.id
+      (google_tags_tag_key.security_role_tag_key.id)    = google_tags_tag_value.ssh_via_iap_tag_value.id,
+      (google_tags_tag_key.application_role_tag_key.id) = google_tags_tag_value.app_web_server_tag_value.id
     }
   }
 }

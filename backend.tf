@@ -17,8 +17,7 @@
 
 terraform {
   backend "gcs" {
-    #bucket = "UPDATE_ME"
-    bucket = "lc-state-lc-base-argolis"
+    bucket = "UPDATE_ME"
     prefix = "terraform/state"
   }
 }

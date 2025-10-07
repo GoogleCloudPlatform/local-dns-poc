@@ -138,7 +138,9 @@ resource "google_compute_network_firewall_policy_rule" "allow_http_https_to_web_
       ports       = ["80", "443"]
     }
     src_ip_ranges = [
-      module.vpcs["hub"].subnets["${var.region}/${var.hub_subnet_name}"].ip_cidr_range
+      module.vpcs["hub"].subnets["${var.region}/${var.hub_subnet_name}"].ip_cidr_range,
+      module.vpcs["spoke_prd"].subnets["${var.region}/${var.spoke_prd_subnet_name}"].ip_cidr_range,
+      module.vpcs["spoke_dev"].subnets["${var.region}/${var.spoke_dev_subnet_name}"].ip_cidr_range
     ]
   }
   dynamic "target_secure_tags" {
