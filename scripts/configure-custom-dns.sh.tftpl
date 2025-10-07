@@ -1,0 +1,27 @@
+#! /bin/bash
+set -euo pipefail
+
+# This script checks if the current VM's hostname matches a target hostname.
+# If it matches, it configures the VM to use a custom list of DNS servers.
+# This is useful for selectively pointing certain VMs to a local DNS resolver.
+
+# Check if this is the target VM for custom DNS configuration.
+if [[ "$(hostname)" == "${target_hostname}" ]]; then
+  echo "Customizing DNS for $(hostname)..."
+  
+  # Idempotency check: If the first custom DNS server is already in the config, exit.
+  if grep -q "${dns_server_ips[0]}" /etc/dhcp/dhclient.conf; then
+    echo "Custom DNS already configured. Exiting."
+    exit 0
+  fi
+  
+  # Prepend the custom DNS servers to the DHCP client configuration file.
+  echo "prepend domain-name-servers ${join(",", dns_server_ips)};" | sudo tee -a /etc/dhcp/dhclient.conf
+  
+  # Renew the DHCP lease to apply the new DNS settings immediately.
+  echo "Renewing DHCP lease to update /etc/resolv.conf..."
+  sudo dhclient -r && sudo dhclient
+  echo "DNS for $(hostname) now points to ${join(", ", dns_server_ips)}."
+else
+  echo "Spoke VM $(hostname) created with Cloud DNS."
+fi

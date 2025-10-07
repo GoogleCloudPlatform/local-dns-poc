@@ -40,33 +40,12 @@ resource "google_compute_instance" "spoke_prd_cli_vms" {
     enable_secure_boot = var.enable_secure_boot
   }
 
-  metadata_startup_script = <<-EOF
-    #! /bin/bash
-    set -euo pipefail
-    
-    # Check if this is the target VM for custom DNS
-    if [[ "$(hostname)" == "vm-prd-cli2" ]]; then
-      echo "Customizing DNS for $(hostname)..."
-      
-      # Idempotency check: exit if already configured
-      if grep -q "10.0.0.11" /etc/dhcp/dhclient.conf; then
-        echo "Custom DNS already configured. Exiting."
-        exit 0
-      fi
-      
-      # Prepend the BIND servers to the DHCP client configuration
-      echo "prepend domain-name-servers 10.0.0.11, 10.0.0.12;" | sudo tee -a /etc/dhcp/dhclient.conf
-      
-      # Renew the DHCP lease to apply the change immediately
-      echo "Renewing DHCP lease to update /etc/resolv.conf..."
-      sudo dhclient -r && sudo dhclient
-      
-      echo "DNS for $(hostname) now points to 10.0.0.11 and 10.0.0.12."
-      
-    else
-      echo "Spoke PRD VM $(hostname) created with default VPC DNS."
-    fi
-    EOF
+  metadata_startup_script = templatefile("${path.module}/scripts/configure-custom-dns.sh.tftpl", {
+    target_hostname = keys(var.spoke_prd_cli_vms)[1]
+    dns_server_ips = [
+      for vm in var.dns_server_vms : vm.ip_address
+    ]
+  })
 
   params {
     resource_manager_tags = {
@@ -101,33 +80,12 @@ resource "google_compute_instance" "spoke_dev_cli_vms" {
     enable_secure_boot = var.enable_secure_boot
   }
 
-  metadata_startup_script = <<-EOF
-    #! /bin/bash
-    set -euo pipefail
-    
-    # Check if this is the target VM for custom DNS
-    if [[ "$(hostname)" == "vm-dev-cli2" ]]; then
-      echo "Customizing DNS for $(hostname)..."
-      
-      # Idempotency check: exit if already configured
-      if grep -q "10.0.0.11" /etc/dhcp/dhclient.conf; then
-        echo "Custom DNS already configured. Exiting."
-        exit 0
-      fi
-      
-      # Prepend the BIND servers to the DHCP client configuration
-      echo "prepend domain-name-servers 10.0.0.11, 10.0.0.12;" | sudo tee -a /etc/dhcp/dhclient.conf
-      
-      # Renew the DHCP lease to apply the change immediately
-      echo "Renewing DHCP lease to update /etc/resolv.conf..."
-      sudo dhclient -r && sudo dhclient
-      
-      echo "DNS for $(hostname) now points to 10.0.0.11 and 10.0.0.12."
-      
-    else
-      echo "Spoke DEV VM $(hostname) created with default VPC DNS."
-    fi
-    EOF
+  metadata_startup_script = templatefile("${path.module}/scripts/configure-custom-dns.sh.tftpl", {
+    target_hostname = keys(var.spoke_dev_cli_vms)[1]
+    dns_server_ips = [
+      for vm in var.dns_server_vms : vm.ip_address
+    ]
+  })
 
   params {
     resource_manager_tags = {

@@ -15,7 +15,7 @@
  */
 
 locals {
-  # --- Records for the acme.local zone ---
+  # --- Records for the domain zone ---
   acme_ns_records = join("\n", [
     for name, details in var.dns_server_vms : "@       IN      NS      ${name}"
   ])
@@ -27,10 +27,25 @@ locals {
   googleapis_ns_records = join("\n", [
     for name, details in var.dns_server_vms : "@       IN      NS      ${name}"
   ])
+
   # These are the "glue" records needed so the nameservers can be resolved.
   googleapis_a_records = join("\n", [
     for name, details in var.dns_server_vms : "${name}    IN      A       ${details.ip_address}"
   ])
+
+  # --- A records for other VMs in the environment ---
+  # This local consolidates A records for various client and utility VMs.
+  other_a_records = join("\n", concat(
+    [for name, details in var.spoke_prd_cli_vms : "${name}    IN      A       ${details.ip_address}"],
+    [for name, details in var.spoke_dev_cli_vms : "${name}    IN      A       ${details.ip_address}"],
+    [
+      # A records for hub utility VMs
+      "vm-hub-cli1    IN      A       ${var.hub_cli1_vm.ip_address}",
+      "vm-hub-www1    IN      A       ${var.hub_www1_vm.ip_address}",
+      # Additional alias for the web server
+      "www            IN      A       ${var.hub_www1_vm.ip_address}"
+    ]
+  ))
 }
 
 resource "google_compute_instance" "hub_dns_server_vms" {
@@ -54,104 +69,14 @@ resource "google_compute_instance" "hub_dns_server_vms" {
   }
 
   metadata = {
-    startup-script = <<-EOF
-      #! /bin/bash
-      set -euo pipefail
-
-      # --- Idempotency Check ---
-      # If the main BIND zone file exists, assume configuration is complete and exit.
-      if [ -f /etc/bind/db.fwd.${var.domain_name} ]; then
-        echo "BIND zone file /etc/bind/db.fwd.${var.domain_name} already exists. Exiting."
-        exit 0
-      fi
-
-      # --- BIND9 Configuration ---
-      # 1. System updates and package installation
-      echo "Updating and installing packages..."
-      sudo apt-get update
-      sudo apt-get install -y bind9 bind9utils bind9-doc
-
-      # 2. Configure BIND9 global options for recursion
-      echo "Configuring BIND9 global options..."
-      sudo tee /etc/bind/named.conf.options > /dev/null <<EOT
-      options {
-        directory "/var/cache/bind";
-        forwarders { 8.8.8.8; 8.8.4.4; };
-        forward only;
-        allow-query { any; };
-        recursion yes;
-        dnssec-validation auto;
-        listen-on-v6 { any; };
-      };
-      EOT
-
-      # 3. Create the authoritative zone file for the customer domain
-      echo "Creating authoritative zone file for ${var.domain_name}..."
-      sudo tee /etc/bind/db.fwd.${var.domain_name} > /dev/null <<EOT
-      ; BIND data file for ${var.domain_name}
-      \$TTL    604800
-      @       IN      SOA     ${var.domain_name}. admin.${var.domain_name}. ( 3 604800 86400 2419200 604800 )
-      
-      ; Name Server records for ${var.domain_name}
-      ${local.acme_ns_records}
-
-      ; Glue records for ${var.domain_name} nameservers
-      ${local.acme_a_records}
-
-      ; Other records for the zone
-      www1    IN      A       10.0.0.21
-      EOT
-
-      # 4. Create the new authoritative zone file for googleapis.com
-      echo "Creating authoritative zone file for googleapis.com..."
-      sudo tee /etc/bind/db.googleapis.com > /dev/null <<EOT
-      ; BIND data file for googleapis.com
-      \$TTL    300
-      @       IN      SOA     googleapis.com. admin.googleapis.com. ( 1 3600 600 86400 300 )
-
-      ; Name Server records for googleapis.com
-      ${local.googleapis_ns_records}
-
-      ; Glue records for googleapis.com nameservers
-      ${local.googleapis_a_records}
-      
-      ; A records for restricted and private access
-      restricted  IN  A   199.36.153.4
-      restricted  IN  A   199.36.153.5
-      restricted  IN  A   199.36.153.6
-      restricted  IN  A   199.36.153.7
-      private     IN  A   199.36.153.8
-      private     IN  A   199.36.153.9
-      private     IN  A   199.36.153.10
-      private     IN  A   199.36.153.11
-      
-      ; Wildcard CNAME that points all other subdomains to private.googleapis.com
-      *           IN  CNAME   private.googleapis.com.
-      EOT
-
-      # 5. Configure local zones
-      echo "Configuring local BIND zones..."
-      sudo tee /etc/bind/named.conf.local > /dev/null <<EOT
-      // Authoritative Zone for ${var.domain_name}
-      zone "${var.domain_name}" IN {
-        type master;
-        file "/etc/bind/db.fwd.${var.domain_name}";
-      };
-
-      // Authoritative Zone for googleapis.com
-      zone "googleapis.com" IN {
-        type master;
-        file "/etc/bind/db.googleapis.com";
-      };
-      EOT
-
-      # 6. Restart BIND9 to apply all changes
-      echo "Restarting BIND9 service..."
-      sudo systemctl restart named.service
-      
-      echo "BIND9 configuration complete."
-      
-    EOF
+    startup-script = templatefile("${path.module}/scripts/configure-bind-server.sh.tftpl", {
+      domain_name           = var.domain_name
+      acme_ns_records       = local.acme_ns_records
+      acme_a_records        = local.acme_a_records
+      googleapis_ns_records = local.googleapis_ns_records
+      googleapis_a_records  = local.googleapis_a_records
+      other_a_records       = local.other_a_records
+    })
   }
 
   params {
