@@ -6,6 +6,8 @@ This Terraform code provides a standardized, well-documented, and easily deploya
 
 This Terraform project deploys a PoC environment in Google Cloud to demonstrate a hybrid DNS resolution strategy. It establishes a hub-and-spoke network topology whith local BIND DNS servers which are deployed in the hub VPC, provide authoritative resolution for a specific domain and override specific public domains for private access, while forwarding all other queries.
 
+![](./docs/Local-DNS-Terraform-PoC-IP-Diagram.drawio.png)
+
 The deployed architecture consists of the following key components:
 
 1.  **Hub-and-Spoke Network**:
