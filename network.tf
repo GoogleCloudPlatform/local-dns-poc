@@ -52,7 +52,7 @@ locals {
 # Create VPCs and subnets
 module "vpcs" {
   source       = "terraform-google-modules/network/google"
-  version      = "18.0.0"
+  version      = "18.1.2"
   for_each     = local.network_configs
   project_id   = each.value.project_id
   network_name = each.value.network_name
