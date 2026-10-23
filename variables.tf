@@ -96,7 +96,7 @@ variable "spoke_dev_subnet_ip" {
 variable "instance_image" {
   description = "The OS image for the VMs."
   type        = string
-  default     = "debian-cloud/debian-11"
+  default     = "debian-cloud/debian-13"
 }
 
 variable "hub_vm_machine_type" {
